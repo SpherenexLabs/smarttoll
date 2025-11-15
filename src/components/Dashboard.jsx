@@ -309,6 +309,12 @@ const Dashboard = ({ user, onLogout }) => {
                   
                   sendTelegramNotification(telegramMessage);
                   
+                  // Update Firebase message with user details
+                  const messageContent = `Vehicle: ${vehicleNumber} | Wallet Balance: ₹${newBalance.toFixed(2)} | Total Deduction: ₹${calculatedToll} | Gate: ${gateNumber}`;
+                  await update(ref(database, 'Tollgate'), {
+                    message: messageContent
+                  });
+                  
                   // Track vehicle type passage for pie chart
                   const formattedVehicleType = vehicleType
                     .split('-')
