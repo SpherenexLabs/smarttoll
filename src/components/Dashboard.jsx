@@ -33,6 +33,11 @@ const Dashboard = ({ user, onLogout }) => {
     'Three Wheeler': 0,
     'Four Wheeler': 0
   });
+  const [gateUsage, setGateUsage] = useState({
+    IR2: 0,
+    IR3: 0,
+    IR4: 0
+  });
 
   // Function to send Telegram notification
   const sendTelegramNotification = async (message) => {
@@ -315,6 +320,13 @@ const Dashboard = ({ user, onLogout }) => {
                     message: messageContent
                   });
                   
+                  // Track gate usage count
+                  const gateUsageKey = `${entry}Usage`;
+                  const currentGateUsage = totalSnapshot.val()?.[gateUsageKey] || 0;
+                  await update(ref(database, 'Tollgate'), {
+                    [gateUsageKey]: currentGateUsage + 1
+                  });
+                  
                   // Track vehicle type passage for pie chart
                   const formattedVehicleType = vehicleType
                     .split('-')
@@ -389,6 +401,13 @@ const Dashboard = ({ user, onLogout }) => {
             'Two Wheeler': vehiclePassages['Two Wheeler'] || 0,
             'Three Wheeler': vehiclePassages['Three Wheeler'] || 0,
             'Four Wheeler': vehiclePassages['Four Wheeler'] || 0
+          });
+          
+          // Update gate usage data
+          setGateUsage({
+            IR2: tollgateData.IR2Usage || 0,
+            IR3: tollgateData.IR3Usage || 0,
+            IR4: tollgateData.IR4Usage || 0
           });
         }
       });
@@ -749,6 +768,62 @@ const Dashboard = ({ user, onLogout }) => {
                     <span className="gate-amount">₹{gateCollections.IR4.toFixed(2)}</span>
                   </div>
                 </div>
+              </div>
+            </div>
+            
+            {/* Most Used Exit Gates */}
+            <div className="chart-section">
+              <h3>Most Used Exit Gates</h3>
+              <div className="gate-usage-container">
+                {(() => {
+                  const totalUsage = Object.values(gateUsage).reduce((sum, count) => sum + count, 0);
+                  
+                  if (totalUsage === 0) {
+                    return <div className="no-data-message">No gate usage data available yet</div>;
+                  }
+                  
+                  const sortedGates = Object.entries(gateUsage)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([gate, count]) => ({
+                      gate,
+                      count,
+                      percentage: ((count / totalUsage) * 100).toFixed(1)
+                    }));
+                  
+                  const maxCount = Math.max(...Object.values(gateUsage));
+                  const colors = {
+                    IR2: '#FF6B6B',
+                    IR3: '#4ECDC4',
+                    IR4: '#45B7D1'
+                  };
+                  
+                  return (
+                    <div className="gate-usage-bars">
+                      {sortedGates.map(({ gate, count, percentage }) => {
+                        const barWidth = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                        return (
+                          <div key={gate} className="usage-bar-container">
+                            <div className="usage-bar-label">
+                              <span className="gate-name">{gate.replace('IR', 'Gate ')}</span>
+                              <span className="usage-count">{count} uses ({percentage}%)</span>
+                            </div>
+                            <div className="usage-bar-wrapper">
+                              <div 
+                                className="usage-bar" 
+                                style={{ 
+                                  width: `${barWidth}%`,
+                                  backgroundColor: colors[gate]
+                                }}
+                              >
+                                <span className="bar-text">{count}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             
