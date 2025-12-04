@@ -883,3 +883,79 @@
   font-weight: 500;
   font-size: 15px;
 }
+
+/* Location Cell Styles */
+.location-cell {
+  max-width: 350px;
+  min-width: 250px;
+}
+
+.location-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.location-address {
+  font-size: 13px;
+  color: #333;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.location-details {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.location-gate,
+.location-time {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.location-gate {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.location-time {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.no-location {
+  color: #999;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Admin Location Display */
+.admin-location-display {
+  margin-top: 25px;
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  color: white;
+}
+
+.admin-location-display h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.location-address-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  border-left: 4px solid rgba(255, 255, 255, 0.5);
+}

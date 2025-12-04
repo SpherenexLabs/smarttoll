@@ -3,7 +3,69 @@ import { ref, get, child, update, onValue } from 'firebase/database';
 import { database, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID } from '../firebase';
 import './Dashboard.css';
 
+const GOOGLE_MAPS_API_KEY = 'AIzaSyB28W9mF0phYG8dR6hcUPyn1NIsC-bm0tE';
+
 const Dashboard = ({ user, onLogout }) => {
+  // Function to get address from coordinates using Google Geocoding API
+  const getAddressFromCoordinates = async (lat, lng) => {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_API_KEY}`;
+      console.log('Fetching address from:', url);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log('Geocoding API Response:', data);
+      
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
+        // Get the most detailed address (usually the first result)
+        const result = data.results[0];
+        
+        console.log('Using result:', result);
+        
+        // Return the formatted address directly - Google provides it in good format
+        return result.formatted_address;
+      } else {
+        console.error('Geocoding failed:', data.status, data.error_message);
+      }
+      
+      return `${lat.toFixed(6)}°N, ${lng.toFixed(6)}°E`;
+    } catch (error) {
+      console.error('Error fetching address:', error);
+      return `${lat.toFixed(6)}°N, ${lng.toFixed(6)}°E`;
+    }
+  };
+
+  // Function to get current geolocation
+  const getCurrentLocation = () => {
+    return new Promise((resolve) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            });
+          },
+          (error) => {
+            console.error('Geolocation error:', error);
+            // Fallback to random location near Bangalore
+            resolve({
+              lat: 12.9716 + (Math.random() - 0.5) * 0.1,
+              lng: 77.5946 + (Math.random() - 0.5) * 0.1
+            });
+          }
+        );
+      } else {
+        // Fallback to random location near Bangalore
+        resolve({
+          lat: 12.9716 + (Math.random() - 0.5) * 0.1,
+          lng: 77.5946 + (Math.random() - 0.5) * 0.1
+        });
+      }
+    });
+  };
+
   const [walletBalance, setWalletBalance] = useState(0);
   const [showRechargeModal, setShowRechargeModal] = useState(false);
   const [rechargeAmount, setRechargeAmount] = useState('');
@@ -38,6 +100,8 @@ const Dashboard = ({ user, onLogout }) => {
     IR3: 0,
     IR4: 0
   });
+  const [userLocations, setUserLocations] = useState({});
+  const [currentLocationAddress, setCurrentLocationAddress] = useState('Loading location...');
 
   // Function to send Telegram notification
   const sendTelegramNotification = async (message) => {
@@ -206,6 +270,21 @@ const Dashboard = ({ user, onLogout }) => {
                     const vehicleType = userData?.vehicleType || 'N/A';
                     const vehicleNumber = userData?.vehicleNumber || 'N/A';
                     
+                    // Get current location and address
+                    const location = await getCurrentLocation();
+                    const address = await getAddressFromCoordinates(location.lat, location.lng);
+                    
+                    // Store location in Firebase
+                    await update(ref(database, `Tollgate/${currentUserId}`), {
+                      lastLocation: {
+                        lat: location.lat,
+                        lng: location.lng,
+                        address: address,
+                        timestamp: Date.now(),
+                        gate: entry
+                      }
+                    });
+                    
                     const currentTime = new Date().toLocaleString('en-IN', {
                       timeZone: 'Asia/Kolkata',
                       hour12: true,
@@ -220,6 +299,7 @@ const Dashboard = ({ user, onLogout }) => {
                       `🔢 Vehicle Number: ${vehicleNumber}\n` +
                       `💰 Toll Amount: FREE\n` +
                       `💳 Wallet Balance: ₹${currentBalance.toFixed(2)}\n` +
+                      `📍 Location: ${address}\n` +
                       `🕐 Time: ${currentTime}`;
                     
                     sendTelegramNotification(telegramMessage);
@@ -296,6 +376,21 @@ const Dashboard = ({ user, onLogout }) => {
                   const vehicleType = userData?.vehicleType || 'N/A';
                   const vehicleNumber = userData?.vehicleNumber || 'N/A';
                   
+                  // Get current location and address
+                  const location = await getCurrentLocation();
+                  const address = await getAddressFromCoordinates(location.lat, location.lng);
+                  
+                  // Store location in Firebase
+                  await update(ref(database, `Tollgate/${currentUserId}`), {
+                    lastLocation: {
+                      lat: location.lat,
+                      lng: location.lng,
+                      address: address,
+                      timestamp: Date.now(),
+                      gate: entry
+                    }
+                  });
+                  
                   const currentTime = new Date().toLocaleString('en-IN', {
                     timeZone: 'Asia/Kolkata',
                     hour12: true,
@@ -310,6 +405,7 @@ const Dashboard = ({ user, onLogout }) => {
                     `🔢 Vehicle Number: ${vehicleNumber}\n` +
                     `💰 Toll Amount: ₹${calculatedToll}\n` +
                     `💳 Remaining Balance: ₹${newBalance.toFixed(2)}\n` +
+                    `📍 Location: ${address}\n` +
                     `🕐 Time: ${currentTime}`;
                   
                   sendTelegramNotification(telegramMessage);
@@ -422,6 +518,13 @@ const Dashboard = ({ user, onLogout }) => {
       fetchWalletBalance();
     } else if (user.type === 'admin') {
       fetchAllUsers();
+      // Fetch current location for admin
+      const loadCurrentLocation = async () => {
+        const location = await getCurrentLocation();
+        const address = await getAddressFromCoordinates(location.lat, location.lng);
+        setCurrentLocationAddress(address);
+      };
+      loadCurrentLocation();
     }
   }, [user]);
 
@@ -473,7 +576,8 @@ const Dashboard = ({ user, onLogout }) => {
             vehicleType: userData.vehicleType,
             vehicleNumber: userData.vehicleNumber,
             walletBalance: userData.walletBalance || 0,
-            createdAt: userData.createdAt
+            createdAt: userData.createdAt,
+            lastLocation: userData.lastLocation || null
           });
         }
         
@@ -662,6 +766,10 @@ const Dashboard = ({ user, onLogout }) => {
             <div className="user-details">
               <p><strong>Email:</strong> {user.email}</p>
               <p><strong>Role:</strong> Administrator</p>
+              <div className="admin-location-display">
+                <h4>📍 Current Location</h4>
+                <p className="location-address-text">{currentLocationAddress}</p>
+              </div>
             </div>
           )}
         </div>
@@ -942,6 +1050,7 @@ const Dashboard = ({ user, onLogout }) => {
                       <th>Vehicle Type</th>
                       <th>Vehicle Number</th>
                       <th>Wallet Balance</th>
+                      <th>Last Location</th>
                       <th>Registration Date</th>
                       <th>Status</th>
                     </tr>
@@ -960,6 +1069,28 @@ const Dashboard = ({ user, onLogout }) => {
                         </td>
                         <td className={user.walletBalance < 80 ? 'balance-warning' : 'balance-ok'}>
                           ₹{user.walletBalance.toFixed(2)}
+                        </td>
+                        <td className="location-cell">
+                          {user.lastLocation ? (
+                            <div className="location-info">
+                              <div className="location-address">
+                                📍 {user.lastLocation.address}
+                              </div>
+                              <div className="location-details">
+                                <span className="location-gate">Gate: {user.lastLocation.gate}</span>
+                                <span className="location-time">
+                                  {new Date(user.lastLocation.timestamp).toLocaleString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="no-location">No location data</span>
+                          )}
                         </td>
                         <td>{new Date(user.createdAt).toLocaleDateString('en-US', {
                           year: 'numeric',
